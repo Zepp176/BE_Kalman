@@ -24,7 +24,7 @@ close all
 [paramIMU] = modele_IMU('model_IMU_3');
 
 % Modele de GPS
-[paramGPS] = modele_GPS('model_GPS_2');
+[paramGPS] = modele_GPS('model_GPS_3');
 
 
 %--------------------------------------------------------------------------

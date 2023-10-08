@@ -51,6 +51,7 @@ paramEST.dt_GPS     = dt_GPS;
 paramEST.tauVIT     = tauVIT;
 paramEST.tauPHI     = tauPHI;
 paramEST.H_eng      = H;
+paramEST.L_eng      = L;
 
 error_max_pos = maxVIT*dt_IMU;
 error_max_the = dt_IMU * maxVIT/L * tan(maxPHI*pi/180);
@@ -90,11 +91,20 @@ switch nom
         % U = [V^*,omeIMU]
         % Z = [posGPS]
         %------------------------------------------------------------------
-                
+        
+        sig_biais = paramIMU.deriv_ome * dt_IMU / paramIMU.biais_ome * (5*pi/(3*180))^2;
+
         % Parametres de l'ESTIMATEUR
         paramEST.dt	= 0.01;     % Pas d'echantillonnage [s]
-        paramEST.Q = diag([(error_max_pos/3)^2; (error_max_pos/3)^2; (paramIMU.sig_ome/3)^2; (paramIMU.biais_ome/3)^2]);
-        paramEST.R = diag([sig_posGPS^2; sig_posGPS^2]);
+        
+        paramEST.Q = diag([(error_max_pos/3)^2; ...
+                           (error_max_pos/3)^2; ...
+                           paramIMU.sig_ome^2; ...
+                           paramIMU.sig_ome^2 + sig_biais^2]);
+        
+        paramEST.R = diag([sig_posGPS^2; ...
+                           sig_posGPS^2; ...
+                           0.02]); % Bruit sur la mesure du biais
         
         % Etat initial
         initEST.POS	= [0 ; 0];	% Position du vehicule
@@ -106,7 +116,7 @@ switch nom
         initEST.nx	= length(initEST.x);
                 
         % Covariance initiale
-        P = diag([0.001; 0.001; 0.001; 0.001]);
+        P = diag([0.001; 0.001; 0.001; (paramIMU.biais_ome/3)^2]);
         
         % Enregistrement
         initEST.P = P;
@@ -118,11 +128,20 @@ switch nom
         % U = [V^*;omeIMU]
         % Z = [posGPS]
         %------------------------------------------------------------------
-                
+        
+        sig_biais = paramIMU.deriv_ome * dt_IMU / paramIMU.biais_ome * (5*pi/(3*180))^2;
+
         % Parametres de l'ESTIMATEUR
         paramEST.dt	= 0.01;     % Pas d'echantillonnage [s]
-        paramEST.Q = diag([(error_max_pos/3)^2; (error_max_pos/3)^2; paramIMU.sig_ome^2; paramIMU.sig_ome^2; (maxVIT/3)^2]);
-        paramEST.R = diag([sig_posGPS^2; sig_posGPS^2; paramODO.sig_vit^2; (paramODO.sig_vit + paramIMU.sig_ome)^2]);
+        paramEST.Q = diag([(error_max_pos/3)^2; ...
+                           (error_max_pos/3)^2; ...
+                           paramIMU.sig_ome^2; ...
+                           paramIMU.sig_ome^2 + sig_biais^2; ...
+                           (maxVIT/3)^2]);
+        paramEST.R = diag([((paramGPS.amp_sau+1)*sig_posGPS)^2; ...
+                           ((paramGPS.amp_sau+1)*sig_posGPS)^2; ...
+                           paramODO.sig_vit^2; ...
+                           (paramODO.sig_vit + paramIMU.sig_ome)^2]);
         
         % Etat initial
         initEST.POS	= [0;0 ];	% Position du vehicule
@@ -135,7 +154,46 @@ switch nom
         initEST.nx	= length(initEST.x);
                 
         % Covariance initiale
-        P = diag([0.001; 0.001; 0.001; 0.001; 0.001]);
+        P = diag([0.001; 0.001; 0.001; (paramIMU.biais_ome/3)^2; 0.001]);
+        
+        % Enregistrement
+        initEST.P = P;
+    
+    case 'model_EST_4'
+        %------------------------------------------------------------------
+        % X = [pos;att;bias;VIT;PHI]
+        % U = [V^*;PHI^*;omeIMU]
+        % Z = [posGPS;...]
+        %------------------------------------------------------------------
+        
+        sig_biais = paramIMU.deriv_ome * dt_IMU / paramIMU.biais_ome * (5*pi/(3*180))^2;
+
+        % Parametres de l'ESTIMATEUR
+        paramEST.dt	= 0.01;     % Pas d'echantillonnage [s]
+        paramEST.Q = diag([(error_max_pos/3)^2; ...
+                           (error_max_pos/3)^2; ...
+                           paramIMU.sig_ome^2; ...
+                           paramIMU.sig_ome^2 + sig_biais^2; ...
+                           (maxVIT/3)^2; ...
+                           (maxPHI/3)^2]);
+        paramEST.R = diag([((paramGPS.amp_sau+1)*sig_posGPS)^2; ...
+                           ((paramGPS.amp_sau+1)*sig_posGPS)^2; ...
+                           paramODO.sig_vit^2; ...
+                           0.02]);
+        
+        % Etat initial
+        initEST.POS	= [0; 0];	% Position du vehicule
+        initEST.ATT	= 0;        % Direction du vehicule [°]
+        initEST.BIAS = 0;       % Biais de l'IMU [°/s]
+        initEST.VIT	= 0;        % Vitesse du vehicule
+        initEST.PHI	= 0;        % Braquage des roues
+
+        % Enregistrement
+        initEST.x	= [initEST.POS; initEST.ATT*pi/180; initEST.BIAS*pi/180; initEST.VIT; initEST.PHI];
+        initEST.nx	= length(initEST.x);
+                
+        % Covariance initiale
+        P = diag([0.001; 0.001; 0.001; (paramIMU.biais_ome/3)^2; 0.001; 0.001]);
         
         % Enregistrement
         initEST.P = P;
